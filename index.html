@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>キティカゲーム</title>
+   <audio id="bgm1" src="ひとりごつ.mp3" ></audio>
+  <audio id="bgm2" src="パジャマパーティーズのうた.mp3" ></audio>
+  <audio id="mergeSound" src="けだま.m4a" preload="auto"></audio>
+
+  <style>
+    body {
+      margin: 0;
+      background: #caedf8;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #05f019;
+      border: 2px solid #333;
+    }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-family: sans-serif;
+      font-size: 20px;
+      color: #333;
+      z-index: 10;
+    }
+    #restart {
+      margin-top: 10px;
+      padding: 5px 10px;
+      font-size: 16px;
+    }
+    #nextCanvas {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      border: 1px solid #aaa;
+      background: #fff;
+    }
+    #gameOverText {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 300px;
+  background-image: url('失敗.jpg'); /* ← 好きな画像に変更！ */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: none;
+  z-index: 20;
+  border: 4px solid red;
+  border-radius: 10px;
+  padding: 0;
+  color: rgb(248, 55, 7);
+  font-size: 40px;
+  font-weight: bold;
+  text-align: right;
+  display: none;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 10px;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+}
+#evolutionChart {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 6px 12px;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.evo-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.evo-arrow {
+  font-size: 20px;
+  color: #555;
+}
+
+
+
+
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div id="score">スコア: 0</div>
+    <button id="restart" style="display:none;">リスタート</button>
+  </div>
+  <div id="gameOverText">失敗！</div>
+  <div id="evolutionChart"></div>
+
+  <canvas id="nextCanvas" width="80" height="80"></canvas>
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
+  <script>
+    const { Engine, Render, Runner, World, Bodies, Body, Events, Composite } = Matter;
+
+    const width = 400;
+    const height = 600;
+    const gameOverY = 50;
+
+    const fruitTypes = [
+    { radius: 30 ,image: '1.png',imageSize:60 }, // ちいかぶ
+    { radius: 35, image: '2.png' },      // うさぎ
+    { radius: 40, image: '3.png' },      // はちげろ
+    { radius: 45, image: '4.png' },      // 白泣き
+    { radius: 50, image: '5.png' },      // 饅頭
+    { radius: 55, image: '6.png' },      // ラッコ
+    { radius: 60, image: '7.png' },      // モモンガ
+    { radius: 65, image: '8.png' },      // しさ
+    { radius: 70, image: '9.png' },      // うさけつ
+    { radius: 75, image: '10.png' },      // ハチハート
+    { radius: 80, image: '11.png' }       // 白
+    ];
+
+    const engine = Engine.create();
+    const world = engine.world;
+
+    const render = Render.create({
+      canvas: document.getElementById('gameCanvas'),
+      engine: engine,
+      options: {
+        width,
+        height,
+        wireframes: false,
+        background: '#d0f0c0'
+      }
+    });
+
+    const bgm1 = document.getElementById('bgm1');
+const bgm2 = document.getElementById('bgm2');
+let currentBGM = 1;
+
+// 音量調整（必要なら）
+bgm1.volume = 0.3;
+bgm2.volume = 0.2;
+
+// 再生が終わったら次の曲へ
+bgm1.addEventListener('ended', () => {
+  currentBGM = 2;
+  bgm2.play();
+});
+bgm2.addEventListener('ended', () => {
+  currentBGM = 1;
+  bgm1.play();
+});
+
+// 最初のクリックで再生スタート
+document.addEventListener('click', () => {
+  if (currentBGM === 1 && bgm1.paused) {
+    bgm1.play().catch(() => {});
+  } else if (currentBGM === 2 && bgm2.paused) {
+    bgm2.play().catch(() => {});
+  }
+});
+
+
+document.addEventListener('click', () => {
+  if (bgm.paused) {
+    bgm.play().catch((e) => {
+      console.log('再生できませんでした:', e);
+    });
+  }
+});
+
+
+    Render.run(render);
+    const runner = Runner.create();
+    Runner.run(runner, engine);
+
+    const ground = Bodies.rectangle(width / 2, height + 25, width, 50, { isStatic: true });
+    const leftWall = Bodies.rectangle(-25, height / 2, 50, height, { isStatic: true });
+    const rightWall = Bodies.rectangle(width + 25, height / 2, 50, height, { isStatic: true });
+    World.add(world, [ground, leftWall, rightWall]);
+
+    let currentFruit = null;
+    let isWaiting = false;
+    let gameOver = false;
+    let score = 0;
+    const fruits = [];
+
+    const scoreDisplay = document.getElementById('score');
+    const restartButton = document.getElementById('restart');
+    const gameOverText = document.getElementById('gameOverText');
+
+    const nextCanvas = document.getElementById('nextCanvas');
+    const nextCtx = nextCanvas.getContext('2d');
+    let nextType = getRandomType();
+
+    function getRandomType() {
+      return Math.floor(Math.random() *5);
+    }
+
+    function drawNextFruit() {
+      const { radius, image } = fruitTypes[nextType];
+      const img = new Image();
+      img.src = image;
+      img.onload = () => {
+        nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+        const size = radius * 2;
+        nextCtx.drawImage(img, (80 - size) / 2, (80 - size) / 2, size, size);
+      };
+    }
+
+    function createFruit(x) {
+      const type = nextType;
+      nextType = getRandomType();
+      drawNextFruit();
+
+      const { radius, image } = fruitTypes[type];
+      const fruit = Bodies.circle(x, 80, radius, {
+        isStatic: true,
+        render: {
+          sprite: {
+            texture: image,
+            xScale: (radius * 2) / 60,
+            yScale: (radius * 2) / 60
+          }
+        }
+      });
+      fruit.fruitType = type;
+      currentFruit = fruit;
+      World.add(world, fruit);
+      isWaiting = false;
+    }
+
+    function dropFruit() {
+      if (currentFruit && !gameOver) {
+        Body.setStatic(currentFruit, false);
+        fruits.push(currentFruit);
+        currentFruit = null;
+        isWaiting = true;
+        setTimeout(() => {
+          if (!checkGameOver()) {
+            createFruit(width / 2);
+          }
+        }, 1000);
+      }
+    }
+
+    function addScore(points) {
+      score += points;
+      scoreDisplay.textContent = `スコア: ${score}`;
+    }
+
+    function checkGameOver() {
+      for (let fruit of fruits) {
+        if (fruit.position.y < gameOverY) {
+          gameOver = true;
+          restartButton.style.display = 'block';
+          gameOverText.style.display = 'block';
+          return true;
+        }
+      }
+      return false;
+    }
+
+    restartButton.addEventListener('click', () => {
+      for (let body of Composite.allBodies(world)) {
+        if (!body.isStatic) {
+          World.remove(world, body);
+        }
+      }
+      fruits.length = 0;
+      score = 0;
+      gameOver = false;
+      scoreDisplay.textContent = 'スコア: 0';
+      restartButton.style.display = 'none';
+      gameOverText.style.display = 'none';
+      nextType = getRandomType();
+      drawNextFruit();
+      createFruit(width / 2);
+    });
+
+    function mergeFruits(f1, f2) {
+      const type = f1.fruitType;
+      if (type !== f2.fruitType) return;
+
+  // 🎵 効果音を鳴らす！
+  const sound = mergeSounds[type];
+  if (sound) {
+    sound.currentTime = 0;
+    sound.play();
+  }
+
+  if (type === fruitTypes.length - 1) {
+    World.remove(world, f1);
+    World.remove(world, f2);
+    addScore(100);
+    return;
+  }
+
+      const newType = type + 1;
+      const { radius, image } = fruitTypes[newType];
+      const newX = (f1.position.x + f2.position.x) / 2;
+      const newY = (f1.position.y + f2.position.y) / 2;
+
+      const newFruit = Bodies.circle(newX, newY, radius, {
+        restitution: 0.2,
+        render: {
+          sprite: {
+            texture: image,
+            xScale: (radius * 2) / 60,
+            yScale: (radius * 2) / 60
+          }
+        }
+      });
+
+      newFruit.fruitType = newType;
+      World.remove(world, f1);
+      World.remove(world, f2);
+      World.add(world, newFruit);
+      fruits.push(newFruit);
+
+      addScore((newType + 1) * 10);
+
+      if (!gameOver && !currentFruit && !isWaiting) {
+        isWaiting = true;
+        setTimeout(() => {
+          if (!checkGameOver()) {
+            createFruit(width / 2);
+          }
+        }, 1000);
+      }
+    }
+
+    Events.on(engine, 'collisionStart', (event) => {
+      const pairs = event.pairs;
+      for (let pair of pairs) {
+        const { bodyA, bodyB } = pair;
+        if (bodyA.fruitType !== undefined && bodyB.fruitType !== undefined) {
+          if (bodyA.fruitType === bodyB.fruitType) {
+            mergeFruits(bodyA, bodyB);
+          }
+        }
+      }
+    });
+
+   render.canvas.addEventListener('click', (e) => {
+      if (currentFruit && !isWaiting && !gameOver) {
+        const rect = render.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        Body.setPosition(currentFruit, { x, y: currentFruit.position.y });
+        dropFruit();
+      }
+    });
+
+    drawNextFruit();
+    createFruit(width / 2);
+
+    function drawGameOverLine(ctx, y) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, y);
+  ctx.lineTo(width, y);
+  ctx.strokeStyle = 'red';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 5]); // 点線にする
+  ctx.stroke();
+
+  // ラベルも表示したい場合
+  ctx.font = '16px sans-serif';
+  ctx.fillStyle = 'red';
+  ctx.fillText('失敗ライン', 10, y + 18);
+  ctx.restore();
+}
+
+Events.on(render, 'afterRender', () => {
+  const ctx = render.context;
+  drawGameOverLine(ctx, gameOverY); // ← gameOverY は判定と同じ高さに！
+});
+
+const evolutionChart = document.getElementById('evolutionChart');
+
+// 画像ファイル名のリスト（進化順）
+const fruitImages = [
+  '1.png',
+  '2.png',
+  '3.png',
+  '4.png',
+  '5.png',
+  '6.png',
+  '7.png',
+  '8.png',
+  '9.png',
+  '10.png',
+  '11.png'
+];
+
+function updateEvolutionChart() {
+  evolutionChart.innerHTML = '';
+  for (let i = 0; i < fruitImages.length; i++) {
+    const img = document.createElement('img');
+    img.src = fruitImages[i];
+    img.className = 'evo-icon';
+    evolutionChart.appendChild(img);
+
+    if (i < fruitImages.length - 1) {
+      const arrow = document.createElement('span');
+      arrow.textContent = '→';
+      arrow.className = 'evo-arrow';
+      evolutionChart.appendChild(arrow);
+    }
+  }
+}
+
+
+updateEvolutionChart();
+
+const mergeSounds = [
+  new Audio('はあ.m4a'),
+  new Audio('けだま.m4a'),
+  new Audio('chiikawa-iya.mp3'),
+  new Audio('饅頭.m4a'),
+  new Audio('らっこ.m4a'),
+  new Audio('モモンガ.m4a'),
+  new Audio('しさ.m4a'),
+  new Audio('いやーはー.m4a'),
+  new Audio('なんとかなれ.m4a'),
+  new Audio('ちいかわ.m4a')
+];
+
+
+
+  </script>
+</body>
+</html>
